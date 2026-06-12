@@ -1,0 +1,291 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Information about the registered user.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "explorerLevel": { "type": "string", "enum": ["Bronze", "Silver", "Gold", "Platinum"] },
+        "availablePoints": { "type": "number" },
+        "totalTrips": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "referralCode": { "type": "string" },
+        "referredBy": { "type": "string" }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "RecentFlightSearch": {
+      "title": "Recent Flight Search",
+      "description": "A flight search recently performed by the user.",
+      "type": "object",
+      "properties": {
+        "origin": { "type": "string" },
+        "destination": { "type": "string" },
+        "departureDate": { "type": "string" },
+        "returnDate": { "type": "string" },
+        "passengers": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["origin", "destination", "createdAt"]
+    },
+    "SavedDestination": {
+      "title": "Saved Destination",
+      "description": "A destination saved by the user.",
+      "type": "object",
+      "properties": {
+        "destinationId": { "type": "string" },
+        "title": { "type": "string" },
+        "location": { "type": "string" },
+        "recommendation": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "savedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["destinationId", "title", "savedAt"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "A travel booking made by the user.",
+      "type": "object",
+      "properties": {
+        "destinationTitle": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "nights": { "type": "number" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled"] },
+        "imageUrl": { "type": "string" },
+        "location": { "type": "string" },
+        "flightInfo": { "type": "string" },
+        "airline": { "type": "string" },
+        "flightNumber": { "type": "string" },
+        "departureTime": { "type": "string" },
+        "arrivalTime": { "type": "string" },
+        "terminal": { "type": "string" },
+        "gate": { "type": "string" },
+        "hotelInfo": { "type": "string" },
+        "hotelName": { "type": "string" },
+        "roomType": { "type": "string" },
+        "checkIn": { "type": "string" },
+        "checkOut": { "type": "string" },
+        "budget": { "type": "number" },
+        "expenses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "amount": { "type": "number" },
+              "date": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["destinationTitle", "startDate", "status", "createdAt"]
+    },
+    "TravelSavingsGoal": {
+      "title": "Travel Savings Goal",
+      "description": "A goal set by the user to save for a specific travel booking.",
+      "type": "object",
+      "properties": {
+        "goalTitle": { "type": "string" },
+        "targetAmount": { "type": "number" },
+        "currentAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "achieved", "paused"] },
+        "targetDate": { "type": "string" },
+        "deposits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "amount": { "type": "number" },
+              "date": { "type": "string", "format": "date-time" },
+              "note": { "type": "string" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["goalTitle", "targetAmount", "currentAmount", "status", "createdAt"]
+    },
+    "RecentSearch": {
+      "title": "Recent Search",
+      "description": "A record of a flight or cruise search performed by the user.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["flight", "cruise"] },
+        "destination": { "type": "string" },
+        "origin": { "type": "string" },
+        "date": { "type": "string" },
+        "departurePort": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "destination", "timestamp"]
+    },
+    "HotelPreferences": {
+      "title": "Hotel Preferences",
+      "description": "User selection for preferred hotel amenities and types.",
+      "type": "object",
+      "properties": {
+        "amenities": { "type": "array", "items": { "type": "string" } },
+        "hotelTypes": { "type": "array", "items": { "type": "string" } },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["amenities", "hotelTypes"]
+    },
+    "MapPreferences": {
+      "title": "Map Preferences",
+      "description": "User preferences for map styles (roadmap/satellite) and visible categories.",
+      "type": "object",
+      "properties": {
+        "visibleCategories": {
+          "type": "object",
+          "properties": {
+            "popular": { "type": "boolean" },
+            "trending": { "type": "boolean" },
+            "seasonal": { "type": "boolean" }
+          }
+        },
+        "mapTypeId": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["visibleCategories", "mapTypeId"]
+    },
+    "PriceAlert": {
+      "title": "Price Alert",
+      "description": "A notification request for price drops or availability on flights or cruises.",
+      "type": "object",
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "airline": { "type": "string" },
+        "line": { "type": "string" },
+        "cruiseName": { "type": "string" },
+        "service": { "type": "string", "enum": ["flight", "cruise"] },
+        "priceThreshold": { "type": "number" },
+        "type": { "type": "string", "enum": ["Price Drop", "Availability"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["from", "to", "priceThreshold", "type", "createdAt"]
+    },
+    "HotelRegistration": {
+      "title": "Hotel Company Registration",
+      "description": "Information provided by a company to register their hotels and promotions.",
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "hotelName": { "type": "string" },
+        "location": { "type": "string" },
+        "description": { "type": "string" },
+        "basePrice": { "type": "number" },
+        "hotelType": { "type": "string" },
+        "amenities": { "type": "array", "items": { "type": "string" } },
+        "imageUrls": { "type": "array", "items": { "type": "string" } },
+        "promotions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "discount": { "type": "string" },
+              "terms": { "type": "string" }
+            }
+          }
+        },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["companyName", "hotelName", "location", "ownerId", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "A push notification or price drop alert for the user.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "title", "message", "read", "createdAt"]
+    },
+    "ReferralCode": {
+      "title": "Referral Code",
+      "description": "A mapping of user referral codes to referrer credentials.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "createdAt"]
+    },
+    "ReferralClaim": {
+      "title": "Referral Claim",
+      "description": "A claim document creating a link showing user as referred by another.",
+      "type": "object",
+      "properties": {
+        "referrerUid": { "type": "string" },
+        "refereeUid": { "type": "string" },
+        "refereeName": { "type": "string" },
+        "pointsAwarded": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "claimed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["referrerUid", "refereeUid", "refereeName", "pointsAwarded", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents."
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "In-app notifications or price-drop alerts for a user."
+    },
+    "/hotelRegistrations/{regId}": {
+      "schema": "HotelRegistration",
+      "description": "Registration requests from hotel companies."
+    },
+    "/users/{userId}/settings/{settingId}": {
+      "schema": "HotelPreferences",
+      "description": "User settings including hotel and map preferences."
+    },
+    "/users/{userId}/priceAlerts/{alertId}": {
+      "schema": "PriceAlert",
+      "description": "Price alerts set by the user for specific flight routes."
+    },
+    "/users/{userId}/savedDestinations/{destId}": {
+      "schema": "SavedDestination",
+      "description": "Destinations saved by a user."
+    },
+    "/users/{userId}/recentSearches/{searchId}": {
+      "schema": "RecentSearch",
+      "description": "Recent searches (flights and cruises) performed by a user."
+    },
+    "/users/{userId}/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Bookings made by a user."
+    },
+    "/users/{userId}/savingsGoals/{goalId}": {
+      "schema": "TravelSavingsGoal",
+      "description": "Travel savings goals set by a user."
+    },
+    "/referralCodes/{code}": {
+      "schema": "ReferralCode",
+      "description": "Registered referral codes mapping to users."
+    },
+    "/referrals/{referralId}": {
+      "schema": "ReferralClaim",
+      "description": "Referrals tracking links and rewards between users."
+    }
+  }
+}

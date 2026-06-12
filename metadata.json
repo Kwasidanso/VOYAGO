@@ -1,0 +1,6 @@
+{
+  "name": "Voyago",
+  "description": "A premium digital concierge for curated travel experiences, bridging the gap between luxury and discovery.",
+  "requestFramePermissions": ["geolocation", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

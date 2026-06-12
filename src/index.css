@@ -1,0 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+@import "leaflet/dist/leaflet.css";
+@import "tailwindcss";
+
+@theme {
+  --font-headline: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-primary: #8c001a;
+  --color-secondary: #0453cd;
+  --color-surface: #f8f9fb;
+  --color-on-surface: #191c1e;
+  --color-on-surface-variant: #434654;
+  --color-secondary-fixed: #dae2ff;
+  --color-on-secondary-fixed: #001848;
+  --color-tertiary-fixed: #ffdeac;
+  --color-on-tertiary-fixed: #281900;
+  --color-surface-container-low: #f2f4f6;
+  --color-surface-container-lowest: #ffffff;
+  --color-outline-variant: #c3c6d6;
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  --animate-shimmer: shimmer 2s infinite;
+
+  @keyframes dashflow {
+    from {
+      stroke-dashoffset: 40;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  
+  @keyframes pulseflow {
+    0%, 100% {
+      stroke-opacity: 0.65;
+      stroke-width: 3.5;
+    }
+    50% {
+      stroke-opacity: 1;
+      stroke-width: 5.5;
+    }
+  }
+}
+
+.route-flow-dash {
+  stroke-dasharray: 10, 10;
+  animation: dashflow 1.5s linear infinite;
+}
+
+.route-flow-pulse {
+  animation: pulseflow 2.5s ease-in-out infinite;
+}
+
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    @apply w-1.5;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-slate-200 rounded-full hover:bg-slate-300 transition-colors;
+  }
+  
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface font-body antialiased;
+  }
+}

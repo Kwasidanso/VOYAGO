@@ -1,0 +1,229 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Global Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isEmailVerified() { return request.auth.token.email_verified == true; }
+    function isOwner(userId) { return request.auth.uid == userId; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128; }
+
+    // 3. User Validation
+    function isValidUser(data) {
+      return data.uid == request.auth.uid
+        && (data.get('email', '') == null || data.get('email', '') is string)
+        && (data.get('displayName', '') == null || data.get('displayName', '') is string)
+        && (data.get('photoURL', '') == null || data.get('photoURL', '') is string)
+        && (data.get('explorerLevel', 'Bronze') is string)
+        && (data.get('availablePoints', 0) is number)
+        && (data.get('totalTrips', 0) is number)
+        && (data.get('referralCode', '') == null || data.get('referralCode', '') is string)
+        && (data.get('referredBy', '') == null || data.get('referredBy', '') is string);
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId) 
+                   && isValidId(userId) && isValidUser(incoming());
+      allow update: if isSignedIn() && isOwner(userId)
+                   && incoming().uid == existing().uid
+                   && isValidUser(incoming());
+    }
+
+    // 4. Saved Destinations Validation
+    function isValidSavedDestination(data) {
+      return data.destinationId is string && data.destinationId.size() <= 100
+        && data.title is string && data.title.size() <= 200
+        && (data.get('location', '') is string && data.location.size() <= 200)
+        && (data.get('recommendation', '') is string && data.recommendation.size() <= 500)
+        && (data.get('imageUrl', '') is string && data.imageUrl.size() <= 500);
+    }
+
+    match /users/{userId}/savedDestinations/{destId} {
+      allow list: if isSignedIn() && isOwner(userId);
+      allow get: if isSignedIn() && isOwner(userId);
+      allow create, update: if isSignedIn() && isOwner(userId)
+                           && isValidId(userId) && isValidId(destId);
+      allow delete: if isSignedIn() && isOwner(userId);
+    }
+
+    // 5. Recent Flight Searches Validation
+    function isValidRecentFlightSearch(data) {
+      return data.origin is string && data.origin.size() <= 100
+        && data.destination is string && data.destination.size() <= 100
+        && (data.get('departureDate', '') is string && data.departureDate.size() <= 50)
+        && (data.get('returnDate', '') is string && data.returnDate.size() <= 50)
+        && (data.get('passengers', '') is string && data.passengers.size() <= 50);
+    }
+
+    match /users/{userId}/recentFlightSearches/{searchId} {
+      allow list: if isSignedIn() && isOwner(userId);
+      allow get: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId)
+                   && isValidId(userId) && isValidId(searchId);
+      allow delete: if isSignedIn() && isOwner(userId);
+    }
+
+    // 6. Bookings Validation
+    function isValidBooking(data) {
+      return data.destinationTitle is string && data.destinationTitle.size() <= 200
+        && data.startDate is string && data.startDate.size() <= 50
+        && (data.get('endDate', '') is string && data.endDate.size() <= 50)
+        && (data.get('nights', 0) is number)
+        && (data.get('amount', 0) is number)
+        && data.status in ['pending', 'confirmed', 'completed', 'cancelled']
+        && (data.get('imageUrl', '') is string && data.imageUrl.size() <= 500)
+        && (data.get('location', '') is string && data.location.size() <= 200)
+        && (data.get('flightInfo', '') is string && data.flightInfo.size() <= 200)
+        && (data.get('airline', '') is string && data.airline.size() <= 100)
+        && (data.get('flightNumber', '') is string && data.flightNumber.size() <= 50)
+        && (data.get('departureTime', '') is string && data.departureTime.size() <= 100)
+        && (data.get('arrivalTime', '') is string && data.arrivalTime.size() <= 100)
+        && (data.get('terminal', '') is string && data.terminal.size() <= 20)
+        && (data.get('gate', '') is string && data.gate.size() <= 20)
+        && (data.get('hotelInfo', '') is string && data.hotelInfo.size() <= 200)
+        && (data.get('hotelName', '') is string && data.hotelName.size() <= 100)
+        && (data.get('roomType', '') is string && data.roomType.size() <= 100)
+        && (data.get('checkIn', '') is string && data.checkIn.size() <= 100)
+        && (data.get('checkOut', '') is string && data.checkOut.size() <= 100)
+        && (data.get('budget', 0) is number)
+        && (data.get('expenses', []) is list);
+    }
+
+    match /users/{userId}/bookings/{bookingId} {
+      allow list: if isSignedIn() && isOwner(userId);
+      allow get: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId)
+                   && isValidId(userId) && isValidId(bookingId);
+      allow update: if isSignedIn() && isOwner(userId);
+      allow delete: if isSignedIn() && isOwner(userId) && existing().status == 'pending';
+    }
+
+    // 7. Travel Savings Goals Validation
+    function isValidSavingsGoal(data) {
+      return data.goalTitle is string && data.goalTitle.size() <= 200
+        && data.targetAmount is number && data.targetAmount > 0
+        && data.currentAmount is number && data.currentAmount >= 0
+        && data.status in ['active', 'achieved', 'paused']
+        && (data.get('targetDate', '') is string && data.targetDate.size() <= 50)
+        && (data.get('deposits', []) is list);
+    }
+
+    match /users/{userId}/savingsGoals/{goalId} {
+      allow list: if isSignedIn() && isOwner(userId);
+      allow get: if isSignedIn() && isOwner(userId);
+      allow create, update: if isSignedIn() && isOwner(userId)
+                           && isValidId(userId) && isValidId(goalId)
+                           && isValidSavingsGoal(incoming());
+      allow delete: if isSignedIn() && isOwner(userId);
+    }
+
+    // 8. Recent Searches Validation
+    function isValidRecentSearch(data) {
+      return data.type in ['flight', 'cruise']
+        && data.destination is string && data.destination.size() <= 200
+        && (data.get('origin', '') is string && data.origin.size() <= 200)
+        && (data.get('date', '') is string && data.date.size() <= 100)
+        && (data.get('departurePort', '') is string && data.departurePort.size() <= 200)
+        && data.timestamp is timestamp;
+    }
+
+    match /users/{userId}/recentSearches/{searchId} {
+      allow list: if isSignedIn() && isOwner(userId);
+      allow get: if isSignedIn() && isOwner(userId);
+      allow create, update: if isSignedIn() && isOwner(userId)
+                           && isValidId(userId) && isValidId(searchId)
+                           && isValidRecentSearch(incoming());
+      allow delete: if isSignedIn() && isOwner(userId);
+    }
+
+    // 9. Settings Validation
+    function isValidSettings(data) {
+      return ((data.get('amenities', []) is list)
+        && (data.get('hotelTypes', []) is list)
+        && (data.get('updatedAt', null) == null || data.updatedAt is timestamp))
+        || ((data.get('mapTypeId', '') is string)
+        && (data.get('visibleCategories', {}) is map)
+        && (data.get('updatedAt', null) == null || data.updatedAt is timestamp));
+    }
+
+    match /users/{userId}/settings/{settingId} {
+      allow read: if isSignedIn() && isOwner(userId);
+      allow write: if isSignedIn() && isOwner(userId) && isValidSettings(incoming());
+    }
+    
+    // 10. Price Alerts Validation
+    function isValidPriceAlert(data) {
+      return data.from is string && data.to is string
+        && data.priceThreshold is number
+        && data.type in ['Price Drop', 'Availability']
+        && data.createdAt is timestamp;
+    }
+
+    match /users/{userId}/priceAlerts/{alertId} {
+      allow list: if isSignedIn() && isOwner(userId);
+      allow get: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId)
+                    && isValidId(userId) && isValidId(alertId)
+                    && isValidPriceAlert(incoming());
+      allow delete: if isSignedIn() && isOwner(userId);
+    }
+
+    // 11. Notifications Validation
+    function isValidNotification(data) {
+      return data.type is string
+        && data.title is string && data.title.size() <= 200
+        && data.message is string && data.message.size() <= 1000
+        && data.read is bool
+        && data.createdAt is timestamp;
+    }
+
+    match /users/{userId}/notifications/{notificationId} {
+      allow list, get: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isValidId(userId) && isValidId(notificationId) && isValidNotification(incoming());
+      allow update: if isSignedIn() && isOwner(userId) && isValidNotification(incoming());
+      allow delete: if isSignedIn() && isOwner(userId);
+    }
+
+    // 12. Referral Codes Validation
+    function isValidReferralCode(data) {
+      return data.uid is string && data.uid.size() <= 128
+        && data.displayName is string && data.displayName.size() <= 200
+        && data.createdAt is timestamp;
+    }
+
+    match /referralCodes/{code} {
+      allow get: if isSignedIn();
+      allow create: if isSignedIn() && incoming().uid == request.auth.uid && isValidReferralCode(incoming());
+      allow update, delete: if false;
+    }
+
+    // 13. Referral Claims Validation
+    function isValidReferralClaim(data) {
+      return data.referrerUid is string && data.referrerUid.size() <= 128
+        && data.refereeUid is string && data.refereeUid.size() <= 128
+        && data.refereeName is string && data.refereeName.size() <= 200
+        && data.pointsAwarded is number
+        && data.status in ['pending', 'claimed']
+        && data.createdAt is timestamp;
+    }
+
+    match /referrals/{referralId} {
+      allow list, get: if isSignedIn() && (resource.data.referrerUid == request.auth.uid || resource.data.refereeUid == request.auth.uid);
+      allow create: if isSignedIn() && incoming().refereeUid == request.auth.uid && isValidReferralClaim(incoming());
+      allow update: if isSignedIn() 
+                   && incoming().referrerUid == existing().referrerUid 
+                   && incoming().refereeUid == existing().refereeUid
+                   && incoming().status == 'claimed'
+                   && existing().status == 'pending'
+                   && isValidReferralClaim(incoming());
+      allow delete: if false;
+    }
+  }
+}
