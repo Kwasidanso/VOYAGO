@@ -277,6 +277,11 @@ Also provide:
 - confidenceScore (number from 0 to 100): confidence in this market budget estimation
 - seasonalAdvice (string): advice on when to book or seasonal price traps for this destination and these dates
 - budgetTips (array of strings): 3-4 highly tailored insider money-saving tips or premium value hacks for this specific destination under these preferences
+- localCurrencyCode (string): the ISO-4217 currency code of the local destination (e.g. "EUR", "JPY", "MVR", "GBP", "MXN", "AUD", "CHF", etc.)
+- localCurrencySymbol (string): the currency symbol of the destination (e.g. "€", "¥", "Rf", "£", "$", etc.)
+- localCurrencyName (string): the currency name (e.g. "Euro", "Maldivian Rufiyaa", "Japanese Yen", etc.)
+- approxExchangeRate (number): estimated standard exchange rate in terms of how many units of this local currency are equivalent to exactly 1.00 USD (e.g., 1 USD = 0.92 EUR, so 0.92, or 1 USD = 153.2 JPY, so 153.2)
+- currencyContextAdvice (string): a brief 1-2 sentence tip about using money at the destination (e.g., card acceptance, tipping customs, or ATM safety).
 
 Return a JSON object in this exact format:
 {
@@ -293,7 +298,12 @@ Return a JSON object in this exact format:
   "totalEstimatedCost": number,
   "confidenceScore": number,
   "seasonalAdvice": "string",
-  "budgetTips": ["string"]
+  "budgetTips": ["string"],
+  "localCurrencyCode": "string",
+  "localCurrencySymbol": "string",
+  "localCurrencyName": "string",
+  "approxExchangeRate": number,
+  "currencyContextAdvice": "string"
 }
 Respond ONLY with this JSON object, with no markdown tags or wrapper format.`;
 
@@ -345,6 +355,58 @@ Respond ONLY with this JSON object, with no markdown tags or wrapper format.`;
       const emergencyBuffer = 250;
       const totalEstimatedCost = totalFlights + totalHotels + totalDining + activityCost + localTransport + premiumSurcharge + emergencyBuffer;
 
+      // Detect currency and rate from destination heuristic
+      const destLower = dest.toLowerCase();
+      let localCurrencyCode = "USD";
+      let localCurrencySymbol = "$";
+      let localCurrencyName = "US Dollar";
+      let approxExchangeRate = 1.0;
+      let currencyContextAdvice = "The local currency is the US Dollar. Credit cards are universally accepted, though keeping small bills is useful for tipping.";
+
+      if (destLower.includes("maldiv") || destLower.includes("male")) {
+        localCurrencyCode = "MVR";
+        localCurrencySymbol = "Rf";
+        localCurrencyName = "Maldivian Rufiyaa";
+        approxExchangeRate = 15.42;
+        currencyContextAdvice = "Resorts accept major credit cards and USD. You only need Rufiyaa cash if visiting inhabited local islands.";
+      } else if (destLower.includes("japan") || destLower.includes("tokyo") || destLower.includes("kyoto") || destLower.includes("osaka")) {
+        localCurrencyCode = "JPY";
+        localCurrencySymbol = "¥";
+        localCurrencyName = "Japanese Yen";
+        approxExchangeRate = 156.40;
+        currencyContextAdvice = "Japan is traditionally cash-heavy, although major cards are accepted in cities. Carry some physical JPY for small food stalls.";
+      } else if (destLower.includes("france") || destLower.includes("germany") || destLower.includes("italy") || destLower.includes("spain") || destLower.includes("paris") || destLower.includes("rome") || destLower.includes("europe") || destLower.includes("greece")) {
+        localCurrencyCode = "EUR";
+        localCurrencySymbol = "€";
+        localCurrencyName = "Euro";
+        approxExchangeRate = 0.92;
+        currencyContextAdvice = "Euro is accepted everywhere. Master/Visa credit cards are standard, but carry some coins for public restrooms or small cafes.";
+      } else if (destLower.includes("london") || destLower.includes("uk") || destLower.includes("england") || destLower.includes("britain") || destLower.includes("united kingdom")) {
+        localCurrencyCode = "GBP";
+        localCurrencySymbol = "£";
+        localCurrencyName = "British Pound";
+        approxExchangeRate = 0.79;
+        currencyContextAdvice = "The UK is almost entirely cashless. Tap-to-pay via mobile or credit cards is expected on transport and in restaurants.";
+      } else if (destLower.includes("canada") || destLower.includes("vancouver") || destLower.includes("toronto") || destLower.includes("montreal")) {
+        localCurrencyCode = "CAD";
+        localCurrencySymbol = "C$";
+        localCurrencyName = "Canadian Dollar";
+        approxExchangeRate = 1.37;
+        currencyContextAdvice = "Canadian dollars are standard. Credit cards are accepted virtually everywhere. Tipping 15-20% is expected.";
+      } else if (destLower.includes("australia") || destLower.includes("sydney") || destLower.includes("melbourne") || destLower.includes("queensland")) {
+        localCurrencyCode = "AUD";
+        localCurrencySymbol = "A$";
+        localCurrencyName = "Australian Dollar";
+        approxExchangeRate = 1.51;
+        currencyContextAdvice = "Australian Dollar is used. Digital payment is nearly universal, and card tipping is optional but appreciated.";
+      } else if (destLower.includes("swiss") || destLower.includes("switzerland") || destLower.includes("zurich") || destLower.includes("geneva")) {
+        localCurrencyCode = "CHF";
+        localCurrencySymbol = "CHF";
+        localCurrencyName = "Swiss Franc";
+        approxExchangeRate = 0.89;
+        currencyContextAdvice = "Swiss Franc is the local currency. Credit cards are standard, but coins are useful for luggage carts or rural farm stalls.";
+      }
+
       res.json({
         baseFlightCost: baseFlight,
         totalFlights,
@@ -364,7 +426,12 @@ Respond ONLY with this JSON object, with no markdown tags or wrapper format.`;
           `Look for hotels that offer complimentary airport shuttles and hot breakfast inclusions to offset local transit and dining costs.`,
           `Book popular tours and attraction admissions online to avail bundle discounts and bypass queues.`
         ],
-        isFallback: true
+        isFallback: true,
+        localCurrencyCode,
+        localCurrencySymbol,
+        localCurrencyName,
+        approxExchangeRate,
+        currencyContextAdvice
       });
     }
   });

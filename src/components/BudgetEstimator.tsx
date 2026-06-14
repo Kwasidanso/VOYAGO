@@ -27,6 +27,11 @@ interface BudgetResult {
   seasonalAdvice: string;
   budgetTips: string[];
   isFallback?: boolean;
+  localCurrencyCode?: string;
+  localCurrencySymbol?: string;
+  localCurrencyName?: string;
+  approxExchangeRate?: number;
+  currencyContextAdvice?: string;
 }
 
 const PRESET_ACTIVITIES = [
@@ -62,6 +67,98 @@ export const BudgetEstimator: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState('');
   const [result, setResult] = useState<BudgetResult | null>(null);
+
+  // Currency Conversion state
+  const [localRate, setLocalRate] = useState<number | null>(null);
+  const [isFetchingRate, setIsFetchingRate] = useState(false);
+  const [usedLiveRate, setUsedLiveRate] = useState(false);
+  const [rateError, setRateError] = useState<string | null>(null);
+  const [isLocalCurrencyActive, setIsLocalCurrencyActive] = useState(false);
+  const [customUsdAmount, setCustomUsdAmount] = useState('100');
+  const [customLocalAmount, setCustomLocalAmount] = useState('');
+
+  // Fetch real-time rate whenever result changes
+  const fetchRate = async () => {
+    if (!result || !result.localCurrencyCode) return;
+    
+    // Avoid fetching for USD
+    if (result.localCurrencyCode === 'USD') {
+      setLocalRate(1.0);
+      setUsedLiveRate(true);
+      setCustomLocalAmount('100');
+      setIsLocalCurrencyActive(false);
+      setRateError(null);
+      return;
+    }
+
+    setIsFetchingRate(true);
+    setRateError(null);
+    try {
+      const res = await fetch('https://open.er-api.com/v6/latest/USD');
+      if (!res.ok) throw new Error('Failed to fetch real-time rates');
+      const data = await res.json();
+      const rate = data.rates[result.localCurrencyCode];
+      if (rate && typeof rate === 'number') {
+        setLocalRate(rate);
+        setUsedLiveRate(true);
+        setCustomLocalAmount((parseFloat(customUsdAmount || '0') * rate).toFixed(2));
+      } else {
+        throw new Error(`Currency ${result.localCurrencyCode} not found in live rates`);
+      }
+    } catch (err: any) {
+      console.error('Error fetching live rate:', err);
+      // Fallback to Gemini's estimated rate
+      const backupRate = result.approxExchangeRate || 1.0;
+      setLocalRate(backupRate);
+      setUsedLiveRate(false);
+      setCustomLocalAmount((parseFloat(customUsdAmount || '0') * backupRate).toFixed(2));
+      setRateError('Using estimated offline rate due to API connectivity limits.');
+    } finally {
+      setIsFetchingRate(false);
+    }
+  };
+
+  useEffect(() => {
+    if (result) {
+      fetchRate();
+    } else {
+      setLocalRate(null);
+      setUsedLiveRate(false);
+    }
+  }, [result]);
+
+  const handleUsdChange = (valStr: string) => {
+    setCustomUsdAmount(valStr);
+    const num = parseFloat(valStr);
+    if (!isNaN(num) && localRate) {
+      setCustomLocalAmount((num * localRate).toFixed(2));
+    } else {
+      setCustomLocalAmount('');
+    }
+  };
+
+  const handleLocalChange = (valStr: string) => {
+    setCustomLocalAmount(valStr);
+    const num = parseFloat(valStr);
+    if (!isNaN(num) && localRate && localRate > 0) {
+      setCustomUsdAmount((num / localRate).toFixed(2));
+    } else {
+      setCustomUsdAmount('');
+    }
+  };
+
+  const formatDestPrice = (usdPrice: number) => {
+    if (isLocalCurrencyActive && result?.localCurrencyCode && localRate) {
+      const converted = usdPrice * localRate;
+      const formatted = converted.toLocaleString(undefined, { 
+        style: 'decimal', 
+        minimumFractionDigits: result.localCurrencyCode === 'JPY' ? 0 : 2,
+        maximumFractionDigits: result.localCurrencyCode === 'JPY' ? 0 : 2 
+      });
+      return `${result.localCurrencySymbol || ''}${formatted} ${result.localCurrencyCode}`;
+    }
+    return formatPrice(usdPrice);
+  };
 
   // Compute number of nights
   const nightsCount = React.useMemo(() => {
@@ -385,7 +482,7 @@ export const BudgetEstimator: React.FC = () => {
                         </span>
                         <div className="flex items-baseline gap-2">
                           <span className="text-4xl md:text-5xl font-headline font-black text-white">
-                            {formatPrice(result.totalEstimatedCost)}
+                            {formatDestPrice(result.totalEstimatedCost)}
                           </span>
                         </div>
                       </div>
@@ -412,6 +509,153 @@ export const BudgetEstimator: React.FC = () => {
                     )}
                   </div>
 
+                  {/* Live Currency Conversion Tool Card */}
+                  {result.localCurrencyCode && (
+                    <div className="bg-white rounded-[2rem] border border-slate-100 p-6 shadow-xl shadow-slate-100/50 flex flex-col gap-5 relative overflow-hidden">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-slate-100">
+                        <div>
+                          <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                            <Coins className="text-secondary" size={16} />
+                            <span>Destination Exchange Rate Hub</span>
+                          </h3>
+                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                            Automated real-time exchange rate tool customized for <span className="font-bold text-slate-600">{destination}</span>
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {/* Live sync badge */}
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-100">
+                            <div className={cn(
+                              "w-1.5 h-1.5 rounded-full",
+                              isFetchingRate ? "bg-blue-400 animate-pulse" : usedLiveRate ? "bg-emerald-400" : "bg-amber-400"
+                            )} />
+                            <span className="text-[9px] font-black uppercase text-slate-500 font-mono tracking-wider">
+                              {isFetchingRate ? "Fetching..." : usedLiveRate ? "Real-Time Live Rate" : "Offline Estimated Rate"}
+                            </span>
+                          </div>
+
+                          {/* Refresh rate button */}
+                          <button
+                            type="button"
+                            onClick={fetchRate}
+                            disabled={isFetchingRate}
+                            className="p-1 px-1.5 rounded-lg border border-slate-100 hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                            title="Refresh rates"
+                          >
+                            <RefreshCw size={11} className={cn(isFetchingRate && "animate-spin")} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Big comparison widget display */}
+                      {localRate && (
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+                          {/* Converter input fields side-by-side */}
+                          <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* USD input */}
+                            <div className="flex flex-col gap-1.5">
+                              <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">
+                                Amount (USD)
+                              </span>
+                              <div className="relative flex items-center">
+                                <span className="absolute left-4 text-slate-400 font-bold text-xs">$</span>
+                                <input
+                                  type="number"
+                                  value={customUsdAmount}
+                                  onChange={(e) => handleUsdChange(e.target.value)}
+                                  placeholder="0.00"
+                                  className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-black text-slate-850 outline-hidden focus:border-secondary/20 font-mono"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Local currency input */}
+                            <div className="flex flex-col gap-1.5">
+                              <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">
+                                {result.localCurrencyName} ({result.localCurrencyCode})
+                              </span>
+                              <div className="relative flex items-center">
+                                <span className="absolute left-4 text-slate-400 font-bold text-xs">
+                                  {result.localCurrencySymbol}
+                                </span>
+                                <input
+                                  type="number"
+                                  value={customLocalAmount}
+                                  onChange={(e) => handleLocalChange(e.target.value)}
+                                  placeholder="0.00"
+                                  className="w-full pl-8 pr-12 py-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-black text-slate-850 outline-hidden focus:border-secondary/20 font-mono"
+                                />
+                                <span className="absolute right-4 text-[9px] font-black text-slate-400">{result.localCurrencyCode}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Central visual text rate information and toggle */}
+                          <div className="md:col-span-4 bg-slate-50/50 border border-slate-100 rounded-2xl p-4 flex flex-col items-center text-center justify-center gap-1.5 min-h-[92px]">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none">
+                              Current Exchange Rate
+                            </span>
+                            <div className="text-xs font-black text-slate-850 font-mono">
+                              1 USD = {localRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} {result.localCurrencyCode}
+                            </div>
+                            <span className="text-[9px] text-slate-400 font-medium font-mono">
+                              1 {result.localCurrencyCode} = {(1 / localRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 5 })} USD
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Wide conversion toggle with high-impact visuals */}
+                      <div className="p-4 bg-secondary/[0.04] border border-secondary/10 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div className="flex-1">
+                          <h4 className="text-xs font-black text-secondary flex items-center gap-1.5 leading-none uppercase">
+                            <Sparkles size={11} className="stroke-[3]" />
+                            Convert Entire Budget Report
+                          </h4>
+                          <p className="text-[10px] text-slate-500 font-semibold mt-1">
+                            Automatically convert flights, hotel bookings, dining, local transit, and emergency reserves to <span className="font-bold text-slate-700">{result.localCurrencyName} ({result.localCurrencyCode})</span> for realistic local spending targets.
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsLocalCurrencyActive(!isLocalCurrencyActive);
+                            showToast(
+                              `Budget display changed to ${!isLocalCurrencyActive ? result.localCurrencyName : 'Universal Wallet currency'}!`,
+                              'success'
+                            );
+                          }}
+                          className={cn(
+                            "w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold uppercase text-[10px] tracking-wider cursor-pointer hover:shadow-xs transition-all active:scale-98 shrink-0 border",
+                            isLocalCurrencyActive
+                              ? "bg-secondary text-white border-secondary"
+                              : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
+                          )}
+                        >
+                          {isLocalCurrencyActive ? `← Show in USD` : `Show in ${result.localCurrencyCode}`}
+                        </button>
+                      </div>
+
+                      {/* Financial Advice */}
+                      {result.currencyContextAdvice && (
+                        <div className="bg-slate-50/50 rounded-2xl p-4 flex gap-3 text-left">
+                          <Info size={14} className="text-secondary shrink-0 mt-0.5" />
+                          <div className="text-[10px] text-slate-500 font-semibold leading-relaxed">
+                            <span className="font-black text-slate-700 uppercase tracking-wider block mb-1">Regional Payment Intelligence ({result.localCurrencyCode})</span>
+                            {result.currencyContextAdvice}
+                            {rateError && (
+                              <span className="block mt-1.5 text-amber-600 font-black tracking-wider uppercase">
+                                Notice: {rateError}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Pricing Grid Items */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     
@@ -426,14 +670,14 @@ export const BudgetEstimator: React.FC = () => {
                             Flights Total
                           </span>
                           <span className="text-xs font-black text-slate-850 font-mono">
-                            {formatPrice(result.totalFlights)}
+                            {formatDestPrice(result.totalFlights)}
                           </span>
                         </div>
-                        <p className="text-sm font-black text-slate-800 mt-1 uppercase">
+                        <p className="text-xs font-black text-slate-800 mt-1 uppercase">
                           {flightClass} Airfare
                         </p>
                         <p className="text-[10px] text-slate-500 mt-1">
-                          Estimated avg {formatPrice(result.baseFlightCost)} roundtrip per traveler, for {travelers} travelers.
+                          Estimated avg {formatDestPrice(result.baseFlightCost)} roundtrip per traveler, for {travelers} travelers.
                         </p>
                       </div>
                     </div>
@@ -449,14 +693,14 @@ export const BudgetEstimator: React.FC = () => {
                             Accommodations
                           </span>
                           <span className="text-xs font-black text-slate-850 font-mono">
-                            {formatPrice(result.totalHotels)}
+                            {formatDestPrice(result.totalHotels)}
                           </span>
                         </div>
-                        <p className="text-sm font-black text-slate-800 mt-1 uppercase">
+                        <p className="text-xs font-black text-slate-800 mt-1 uppercase">
                           Hotel Stay
                         </p>
                         <p className="text-[10px] text-slate-500 mt-1">
-                          Estimated avg {formatPrice(result.hotelNightlyRate)}/nightly rate, for {nightsCount} nights total.
+                          Estimated avg {formatDestPrice(result.hotelNightlyRate)}/nightly rate, for {nightsCount} nights total.
                         </p>
                       </div>
                     </div>
@@ -472,14 +716,14 @@ export const BudgetEstimator: React.FC = () => {
                             Dining & Drinks
                           </span>
                           <span className="text-xs font-black text-slate-850 font-mono">
-                            {formatPrice(result.totalDining)}
+                            {formatDestPrice(result.totalDining)}
                           </span>
                         </div>
-                        <p className="text-sm font-black text-slate-800 mt-1 uppercase">
+                        <p className="text-xs font-black text-slate-800 mt-1 uppercase">
                           Gastronomies
                         </p>
                         <p className="text-[10px] text-slate-500 mt-1">
-                          Calculated at {formatPrice(result.diningCostPerDay)}/daily avg food cost per host, scaled for all days.
+                          Calculated at {formatDestPrice(result.diningCostPerDay)}/daily avg food cost per host, scaled for all days.
                         </p>
                       </div>
                     </div>
@@ -487,7 +731,7 @@ export const BudgetEstimator: React.FC = () => {
                     {/* Activities */}
                     <div className="bg-white rounded-2xl border border-slate-100 p-5 flex items-start gap-4">
                       <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                        <Compass size={18} />
+                        < Compass size={18} />
                       </div>
                       <div className="flex-1">
                         <div className="flex justify-between items-start">
@@ -495,10 +739,10 @@ export const BudgetEstimator: React.FC = () => {
                             Leisure Outings
                           </span>
                           <span className="text-xs font-black text-slate-850 font-mono">
-                            {formatPrice(result.activityCost)}
+                            {formatDestPrice(result.activityCost)}
                           </span>
                         </div>
-                        <p className="text-sm font-black text-slate-800 mt-1 uppercase">
+                        <p className="text-xs font-black text-slate-800 mt-1 uppercase">
                           Excursions Total
                         </p>
                         <p className="text-[10px] text-slate-500 mt-1">
@@ -518,10 +762,10 @@ export const BudgetEstimator: React.FC = () => {
                             Local Transit
                           </span>
                           <span className="text-xs font-black text-slate-850 font-mono">
-                            {formatPrice(result.localTransport)}
+                            {formatDestPrice(result.localTransport)}
                           </span>
                         </div>
-                        <p className="text-sm font-black text-slate-800 mt-1 uppercase">
+                        <p className="text-xs font-black text-slate-800 mt-1 uppercase">
                           Cabs & Shuttles
                         </p>
                         <p className="text-[10px] text-slate-500 mt-1">
@@ -541,14 +785,14 @@ export const BudgetEstimator: React.FC = () => {
                             Buffers & Levies
                           </span>
                           <span className="text-xs font-black text-slate-850 font-mono">
-                            {formatPrice((result.premiumSurcharge || 0) + result.emergencyBuffer)}
+                            {formatDestPrice((result.premiumSurcharge || 0) + result.emergencyBuffer)}
                           </span>
                         </div>
-                        <p className="text-sm font-black text-slate-800 mt-1 uppercase">
+                        <p className="text-xs font-black text-slate-800 mt-1 uppercase">
                           Levies & Padding
                         </p>
                         <p className="text-[10px] text-slate-500 mt-1">
-                          Premium Markup: {formatPrice(result.premiumSurcharge || 0)}. Emergency Fallback Contingency: {formatPrice(result.emergencyBuffer)}.
+                          Premium Markup: {formatDestPrice(result.premiumSurcharge || 0)}. Emergency Fallback contingency: {formatDestPrice(result.emergencyBuffer)}.
                         </p>
                       </div>
                     </div>
